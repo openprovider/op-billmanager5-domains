@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mgrdata>
+    <plugin name="pmopenprovider">
+        <group>processing_module</group>
+        <params>
+            <type name="domain"/>
+        </params>
+        <msg name="desc_short" lang="ru">Openprovider модуль</msg>
+        <msg name="desc_short" lang="en">Openprovider module</msg>
+        <msg name="desc_full" lang="ru">Openprovider модуль</msg>
+        <msg name="desc_full" lang="en">Openprovider module</msg>
+    </plugin>
+    <metadata name="processing.edit.pmopenprovider" type="form">
+        <form>
+            <page name="connect">
+                <field name="url">
+                    <input name="url" required="yes" type="text" />
+                </field>
+                <field name="login">
+                    <input name="login" required="yes" type="text" />
+                </field>
+                <field name="password">
+                    <input name="password" required="yes" type="password" />
+                </field>
+            </page>
+        </form>
+    </metadata>
+    <lang name="en">
+        <messages name="label_processing_modules">
+            <msg name="pmopenprovider">Openprovider</msg>
+            <msg name="module_pmopenprovider">Openprovider module</msg>
+        </messages>
+
+        <messages name="processing.edit.pmopenprovider">
+            <msg name="url">Url</msg>
+            <msg name="hint_url">API URL</msg>
+            <msg name="login">Login</msg>
+            <msg name="hint_login">Login</msg>
+            <msg name="password">Password</msg>
+            <msg name="hint_password">Password</msg>
+        </messages>
+    </lang>
+
+    <lang name="ru">
+        <messages name="label_processing_modules">
+            <msg name="pmopenprovider">Openprovider</msg>
+            <msg name="module_pmopenprovider">Интеграция с Openprovider</msg>
+        </messages>
+        <messages name="processing.edit.pmopenprovider">
+            <msg name="url">Url</msg>
+            <msg name="hint_url">API URL</msg>
+            <msg name="login">Login</msg>
+            <msg name="hint_login">Login</msg>
+            <msg name="password">Password</msg>
+            <msg name="hint_password">Password</msg>
+        </messages>
+    </lang>
+</mgrdata>
