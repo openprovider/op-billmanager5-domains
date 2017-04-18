@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF8"?>
+<mgrdata>
+    <handler name="domainauthcode.php" type="xml">
+        <func name="domain.authcode"/>
+    </handler>
+    <metadata name="domain.authcode" type="form" selficon="service" mgr="billmgr" sprite="yes" decorated="yes">
+        <form title="name">
+            <field name="authcodelist">
+                <list name="authcodelist" type="table">
+                    <col name="id" type="data"/>
+                    <col name="domain" type="data"/>
+                    <col name="authinfo" type="data"/>
+                </list>
+            </field>
+        </form>
+    </metadata>
+    <metadata name="domain" type="list" key="id" keyname="name" mgr="billmgr">
+        <toolbar>
+            <toolgrp name="edit" first="yes">
+                <toolbtn func="domain.authcode" name="domainauthcode" img="t-rights" sprite="yes" type="edit" level="user"/>
+            </toolgrp>
+        </toolbar>
+    </metadata>
+    <lang name="ru">
+        <messages name="domain.authcode">
+            <msg name="title">Запрос трансферкода</msg>
+            <msg name="list_id">Id</msg>
+            <msg name="list_domain">Домен</msg>
+            <msg name="list_authinfo">Трансферкод</msg>
+        </messages>
+        <messages name="domain">
+            <msg name="short_domainauthcode" added="common">AuthCode</msg>
+        </messages>
+    </lang>
+    <lang name="en">
+        <messages name="domain.authcode">
+            <msg name="title">Request Transfer-Code</msg>
+            <msg name="list_id">Id</msg>
+            <msg name="list_domain">Domain</msg>
+            <msg name="list_authinfo">Transfer-Code</msg>
+        </messages>
+        <messages name="domain">
+            <msg name="short_domainauthcode" added="common">AuthCode</msg>
+        </messages>
+    </lang>
+</mgrdata>
