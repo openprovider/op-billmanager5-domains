@@ -811,6 +811,67 @@ class openprovider extends Registrar{
 
     /**
      * @param \Domain $domain
+     * @return \OP_Reply
+     * @throws \Exception
+     */
+    protected function requestEmailVerification($domain ){
+        $domainParams = $this->getDomainParams( $domain );
+
+        $info = $this->sendRequest("searchDomainRequest", array(
+            'extension' => $domainParams["extension"],
+            "domainNamePattern" => $domainParams["name"],
+        ) );
+
+        $handler = null;
+        if($info == null || ! ($info instanceof \OP_Reply) ){
+            throw new \Exception("Unrecognized response from OPENPROVIDER");
+        } else {
+
+            $info = $info->getValue();
+
+            $out = array();
+            $out["result"] = "error";
+
+            foreach ($info["results"] as $result) {
+                if (
+                    $result["domain"]["name"] . "." . $result["domain"]["extension"] == $domain->getName() ||
+                    $result["domain"]["name"] . "." . $result["domain"]["extension"] == $domain->getPunycode()
+                ) {
+                    $handler = $result["ownerHandle"];
+                }
+            }
+        }
+
+        if( $handler == null ){
+            throw new \Exception("Domain not found");
+        }
+
+        $ownerInfo = $this->sendRequest( "retrieveCustomerRequest", array(
+            "handle" => $handler
+        ));
+
+        $emailForVerification = null;
+
+        if($ownerInfo == null || ! ($ownerInfo instanceof \OP_Reply) ){
+            throw new \Exception("Unrecognized response from OPENPROVIDER");
+        } else {
+            $ownerInfoValue = $ownerInfo->getValue();
+
+            $emailForVerification = $ownerInfoValue["email"];
+        }
+
+        if( $emailForVerification == null ){
+            throw new \Exception("Owner email not found");
+        }
+
+        return $this->sendRequest("startCustomerEmailVerificationRequest", array(
+            "email" => $emailForVerification
+        ));
+    }
+
+
+    /**
+     * @param \Domain $domain
      * @return array
      * @throws \Exception
      */
@@ -837,6 +898,16 @@ class openprovider extends Registrar{
                     "result" => "success",
                     "authcode" => "Domain not found"
                 );
+            }
+
+            if(strpos($ex->getMessage(),"Auth code sending is denied to unverified email")!==false){
+                try{
+                    $this->requestEmailVerification( $domain );
+                    return array(
+                        "result" => "success",
+                        "authcode" => "Auth code sending is denied to unverified email. You must verify email."
+                    );
+                }catch (\Exception $nothing){  }
             }
 
             throw $ex;
