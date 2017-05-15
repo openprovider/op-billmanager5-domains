@@ -50,6 +50,10 @@ class openprovider extends Registrar{
                 if($contactProperty["type"] == "select"){
                     $options = array();
 
+                    if(!isset($contactProperty["required"]) || $contactProperty["required"] != 1){
+                        $options[ "" ] = "Not selected";
+                    }
+
                     foreach ( $contactProperty["options"] as $option ){
                         $options[ $option["value"] ] = $option["description"];
                     }
@@ -263,7 +267,8 @@ class openprovider extends Registrar{
 
         foreach ($additionalFields["domain"] as $field ){
             if( $contact["xml"] instanceof \SimpleXMLElement &&
-                isset($contact["xml"]->{ "additionaldomaininfo_" . $field["name"] })
+                isset($contact["xml"]->{ "additionaldomaininfo_" . $field["name"] }) &&
+                trim((string)$contact["xml"]->{ "additionaldomaininfo_" . $field["name"] }) != ""
             ){
                 $request["additionalData"][$field["name"]] = (string)$contact["xml"]->{"additionaldomaininfo_" . $field["name"]};
             }
@@ -314,7 +319,8 @@ class openprovider extends Registrar{
                         (!isset( $extensionData[$field["name"]] ) || trim($extensionData[$field["name"]]) == "")
                     ){
                         if( $billmgrContact["xml"] instanceof \SimpleXMLElement &&
-                            isset($billmgrContact["xml"]->{$field["name"]})
+                            isset($billmgrContact["xml"]->{$field["name"]}) &&
+                            trim((string)$billmgrContact["xml"]->{$field["name"]}) != ""
                         ) {
                             $modifyRequest["extensionAdditionalData"][$request["domain"]["extension"]][$field["name"]] = (string)$contact["xml"]->{$field["name"]};
                         }
