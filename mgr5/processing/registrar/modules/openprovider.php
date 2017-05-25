@@ -527,7 +527,11 @@ class openprovider extends Registrar{
                 "name" => $ns["ns"]
             );
             if(isset($ns["ip"])){
-                $tmp["ip"] = $ns["ip"];
+                if(strpos($ns["ip"],":") !== false){
+                    $tmp["ip6"] = $ns["ip"];
+                } else {
+                    $tmp["ip"] = $ns["ip"];
+                }
             }
 
             $p_nss[] = $tmp;
