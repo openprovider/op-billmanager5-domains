@@ -4,7 +4,7 @@ Plugin for Billmanager5 integration with openprovider
 # System requirements
 
 * Billmanager-ready OS (https://doc.ispsystem.com/index.php/BILLmanager_Installation_guide)
-* PHP 5.4+ with php-mysqli, php-curl, php-simplexml
+* PHP 5.4+ with [php-mysqli](https://www.php.net/manual/mysqli.installation.php), [php-curl](https://www.php.net/manual/curl.installation.php), [php-simplexml](https://www.php.net/manual/simplexml.installation.php), [php-xml](https://www.php.net/manual/dom.installation.php)
 
 # Installation
 
@@ -29,4 +29,4 @@ https://doc.ispsystem.com/index.php/Providing_domain_names_to_clients
 
 > When i'm trying to install plugin, billmanager returns an internal error
 
-First of all, check that execution rights for "addon/domainauthcode.php" and "addon/pmopenprovider" (as per step 3) are set correctly. If it dosn't work, check php interpreter path (for example enter "whereis php" in command prompt). If it isn't "/usr/bin/php", changing the line "#/usr/bin/php" to "#[YOUR_PATH]" in "addon/domainauthcode.php" and "addon/pmopenprovider" should help.
+First of all, check that execution rights for "addon/domainauthcode.php" and "addon/pmopenprovider" (as per step 3) are set correctly. If it dosn't work, check php interpreter path (for example enter "whereis php" in command prompt). If it isn't "/usr/bin/php", changing the line "#/usr/bin/php" to "#[YOUR_PATH]" in "addon/domainauthcode.php" and "addon/pmopenprovider" should help. Finally check is required (from System requirements) PHP modules are installed using "php -i" command.
