@@ -367,9 +367,6 @@ class Registrar{
         $module = $this->getRegistrarModule();
         $domainInfo = DBApi::getDomainInfo( Request::getInstance()->getItem() );
 
-        if( \DomainLock::getInstance(\Config::$REGNAME)->isLocked( new \Domain((string)$domainInfo->domain), "updateNs" ) ){
-            throw new \ClientException("Operation locked");
-        }
 
         try {
             $nsList = DBApi::getNSS($domainInfo->id);
