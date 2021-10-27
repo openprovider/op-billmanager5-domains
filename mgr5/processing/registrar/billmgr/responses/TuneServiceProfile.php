@@ -45,7 +45,7 @@ class TuneServiceProfile extends Billmgr\Response{
     }
 
 
-    public function addSelectField( $name, $values, $required=false, $nameText=null, $description=null ){
+    public function addSelectField( $name, $values, $required=false, $nameText=null, $description=null , $slistWithoutKey = false){
         $names = array();
         if(isset($this->xml->metadata->form->page)){
             foreach ( $this->xml->metadata->form->page as $page ){
@@ -77,8 +77,11 @@ class TuneServiceProfile extends Billmgr\Response{
             $list = $this->xml->addChild("slist");
             $list->addAttribute("name", htmlspecialchars($fieldName));
             foreach ($values as $key => $value) {
-                $list->addChild("val", htmlspecialchars($value))
-                    ->addAttribute("key", htmlspecialchars($key));
+                $sl = $list->addChild("val", htmlspecialchars($value));
+                    if(!$slistWithoutKey){
+                        $sl->addAttribute("key", htmlspecialchars($key));
+                    }
+
             }
         }
 
@@ -95,6 +98,20 @@ class TuneServiceProfile extends Billmgr\Response{
                 $this->setMessage("hint_" . $fieldName, $description);
             }
         }
+    }
+
+    /**
+     * @return \SimpleXMLElement
+     */
+    public function getXml() {
+        return $this->xml;
+    }
+
+    /**
+     * @param \SimpleXMLElement $xml
+     */
+    public function setXml($xml) {
+        $this->xml = $xml;
     }
 
 
@@ -188,7 +205,22 @@ class TuneServiceProfile extends Billmgr\Response{
         }
     }
 
-    public function addInputField( $name, $defValue = "", $required=false, $nameText=null, $description=null ){
+    public function addLink($url, $text) {
+        $this->xml->addChild("agreement_link", $url);
+        foreach ($this->xml->metadata->form->page as $page) {
+            if ($page["name"] == $this->getCtype()) {
+                $field = $page->addChild("field");
+                $field->addAttribute("name", "agreement_link");
+                $this->setMessage("agreement_link", $text);
+                $field->addAttribute("noname", "yes");
+                $link = $field->addChild("link");
+                $link->addAttribute("name", "agreement_link");
+                $link->addAttribute("target", "_blank");
+            }
+        }
+    }
+
+    public function addInputField( $name, $defValue = "", $required=false, $nameText=null, $description=null, $type="text" ){
         $names = array();
         if(isset($this->xml->metadata->form->page)){
             foreach ( $this->xml->metadata->form->page as $page ){
@@ -196,7 +228,7 @@ class TuneServiceProfile extends Billmgr\Response{
                 if($page["name"] == $this->getCtype() ) {
                     $currentName = $page["name"] . "_" . $name;
                     $names[] = $currentName;
-                    $this->addNodeInputField($page, $currentName, $defValue, $required);
+                    $this->addNodeInputField($page, $currentName, $defValue, $required, $type);
 
                     $useOwner = $page->xpath("field[@name='" . $page["name"] . "_contact_use_first']");
                     if(
@@ -212,7 +244,7 @@ class TuneServiceProfile extends Billmgr\Response{
             }
         } else {
             $names[] = $name;
-            $this->addNodeInputField( $this->xml->metadata->form, $name, $defValue, $required);
+            $this->addNodeInputField( $this->xml->metadata->form, $name, $defValue, $required, $type);
         }
 
         if($defValue != ""){
@@ -234,19 +266,80 @@ class TuneServiceProfile extends Billmgr\Response{
         }
     }
 
+    public function addSelectRule($key, $value, $target, $show = true) {
+        $form = null;
+        if (isset($this->xml->metadata->form->page)) {
+            foreach ($this->xml->metadata->form->page as $page) {
+                /* @var \SimpleXMLElement $page */
+                if($page["name"] == $this->getCtype()) {
+                    $form = $page;
+                    break;
+                }
+            }
+        } else {
+            $form = $this->xml->metadata->form;
+        }
+        if($form instanceof \SimpleXMLElement) {
+            $keyNodes = $form->xpath("//select[@name='".$this->getCtype()."_".$key."']");
+            foreach ($keyNodes as $keyNode) {
+                $if = $keyNode->addChild("if");
+                $if->addAttribute("value", htmlspecialchars($value));
+                if ($show) {
+                    $if->addAttribute("show", htmlspecialchars($this->getCtype()."_".$target));
+                    $else = $keyNode->addChild("else");
+                    $else->addAttribute("hide", htmlspecialchars($this->getCtype()."_".$target));
+                } else {
+                    $if->addAttribute("hide", htmlspecialchars($this->getCtype()."_".$target));
+                    $else = $keyNode->addChild("else");
+                    $else->addAttribute("show", htmlspecialchars($this->getCtype()."_".$target));
+                }
+            }
+        }
+    }
+
+    public function addRule( $key, $value, $target, $show = true ){
+        $form = null;
+        if(isset($this->xml->metadata->form->page)){
+            foreach ( $this->xml->metadata->form->page as $page ){
+                /* @var \SimpleXMLElement $page*/
+                if($page["name"] == $this->getCtype() ) {
+                    $form = $page;
+                    break;
+                }
+            }
+        } else {
+            $form = $this->xml->metadata->form;
+        }
+        if( $form instanceof \SimpleXMLElement){
+            $keyNodes = $form->xpath("//[name='".$key."']");
+            foreach ($keyNodes as $keyNode){
+                if( !in_array($keyNode->getName(), array("field","page") )){
+                    $if = $keyNode->addChild("if");
+                    $if->addAttribute("value", htmlspecialchars($value));
+                    if( $show ){
+                        $if->addAttribute("show", htmlspecialchars($target));
+                    } else {
+                        $if->addAttribute("hide", htmlspecialchars($target));
+                    }
+                }
+            }
+        }
+    }
+
     /**
      * @param \SimpleXMLElement $node
      * @param $name
      * @param string $defValue
      * @param bool $required
+     * @param string $type
      */
-    private function addNodeInputField($node, $name, $defValue = "", $required=false ){
+    private function addNodeInputField($node, $name, $defValue = "", $required=false, $type="text" ){
 
         $field = $node->addChild("field");
         $field->addAttribute("name",  $name );
 
         $select = $field->addChild("input");
-        $select->addAttribute("type", "text");
+        $select->addAttribute("type", $type);
         $select->addAttribute("name", htmlspecialchars($name) );
         if( $required ){
             $select->addAttribute("required", "yes");
@@ -288,6 +381,35 @@ class TuneServiceProfile extends Billmgr\Response{
         }else {
             $updateWarningMessage[0][0] = htmlspecialchars($message);
         }
+
+        /*$unlockedInputs = [
+            "phone",
+            "mobile",
+            "fax",
+            "private",
+            "email",
+            "postal_country",
+            "postal_state",
+            "postal_postcode",
+            "postal_city",
+            "postal_address",
+            "postal_addressee"
+        ];
+
+
+        foreach (["input","textarea","select"] as $inputType) {
+            $inputs = $this->xml->xpath("//" . $inputType);
+
+            foreach ($inputs as $input) {
+                if (!in_array((string)$input["name"], $unlockedInputs)) {
+                    if (isset($input["readonly"])) {
+                        $input["readonly"] = "yes";
+                    } else {
+                        $input->addAttribute("readonly", "yes");
+                    }
+                }
+            }
+        }*/
     }
 
     public function setMessage( $name, $value ){

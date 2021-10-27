@@ -6,7 +6,7 @@ class UploadExt extends Billmgr\Response{
     private $exts = array();
 
 
-    public function __construct( $exts = array('jpg','pdf','png','gif') )
+    public function __construct( $exts = array('jpg','pdf','png','gif',"jpeg","bmp") )
     {
         $this->setExts($exts);
         parent::__construct(true);

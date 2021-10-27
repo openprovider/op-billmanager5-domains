@@ -8,11 +8,36 @@ use SimpleXMLElement;
 
 class Api{
 
+    public static function setProfileError( $item, $profileType, $profileParam, $errorMessage ){
+        return static::sendRequest("service_profile.error", array(
+            "item" => $item,
+            "type" => $profileType,
+            "param" => $profileParam,
+            "warning_message" => $errorMessage,
+            "sok" => "ok"
+        ));
+    }
+
+    public static function setProcessingBalance( $processingId, $balance, $currency ){
+        return static::sendRequest("processing.savebalance",array(
+            "balance" => $balance,
+            "currency" => $currency,
+            "processingmodule" => $processingId,
+            "notify_time" => date("Y-m-d H:i:s"),
+            "sok" => "ok",
+        ));
+    }
+
     /**
+     * @param array $filters
      * @return SimpleXMLElement
      */
-    public static function getAccountList(){
-        return self::sendRequest("account");
+    public static function getAccountList( $filters = array() ){
+        if( !empty( $filters ) ){
+            $filters["filter"] = "on";
+        }
+
+        return self::sendRequest("account", $filters);
     }
 
     /**
@@ -68,24 +93,31 @@ class Api{
     public static function runningOperationError($runningOperationId, $moduleInfo, \Exception $ex ){
         $errorXml = new SimpleXMLElement("<?xml version=\"1.0\" encoding=\"UTF-8\"?><doc/>");
 
-        $errorInfo = $errorXml->addChild("error");
+        /*$errorInfo = $errorXml->addChild("error");
         $errorInfo->addAttribute("date", htmlspecialchars( date("Y-m-d H:i:s") ));
-        $errorInfo->addAttribute("type", "type");
-        $errorInfo->addAttribute("object", "object");
-        $errorInfo->addAttribute("value", "value");
         $errorInfo->addChild("backtrace", htmlspecialchars( $ex->getTraceAsString() ));
-        $errorInfo->addChild("log", htmlspecialchars( "LogFile: " . \logger::$filename ));
+        $errorInfo->addChild("log", htmlspecialchars( "LogFile: " . \logger::$filename ));*/
 
         $module = $errorXml->addChild("processingmodule");
         $module->addAttribute("date", htmlspecialchars( date("Y-m-d H:i:s") ));
         $module->addAttribute("id", htmlspecialchars( (string)$moduleInfo->id ));
         $module->addAttribute("name", htmlspecialchars( (string)$moduleInfo->name ));
 
-        $errorXml->addChild("custommessage", htmlspecialchars( $ex->getMessage() ) );
+        $pmError = $module->addChild("error");
+        $pmError->addAttribute("date", htmlspecialchars( date("Y-m-d H:i:s") ));
+        $pmError->addChild("backtrace", htmlspecialchars( $ex->getTraceAsString() ));
+        $pmError->addChild("log", htmlspecialchars( "LogFile: " . \logger::$filename . " (" . \logger::getRand() . ")" ));
+
+        $param = $pmError->addChild("param", htmlspecialchars($ex->getMessage()));
+        $param->addAttribute("name","error");
+        $param->addAttribute("type","msg");
+
+        //$errorXml->addChild("custommessage", htmlspecialchars( $ex->getMessage() ) );
 
         return self::sendRequest( "runningoperation.edit", array(
             "elid" => $runningOperationId,
             "errorxml" => (string)$errorXml->asXML(),
+            "sok" => "ok",
         ));
     }
 
@@ -102,6 +134,12 @@ class Api{
         ));
     }
 
+    public static function getRunningOperation( $operationId ){
+        return self::sendRequest( "runningoperation.edit", array(
+            "elid" => $operationId,
+        ));
+    }
+
     /**
      * @param $runningOperationId
      * @return SimpleXMLElement
@@ -111,6 +149,11 @@ class Api{
             "elid" => $runningOperationId,
             "manual" => "off",
             "sok" => "ok"
+        ));
+    }
+    public static function deleteRunningOperation($runningOperationId){
+        return self::sendRequest( "runningoperation.delete", array(
+            "elid" => $runningOperationId,
         ));
     }
 
@@ -125,12 +168,14 @@ class Api{
      */
     public static function importContact($moduleId, $type, $contact ){
         $createInfo =  self::sendRequest( "profile.edit" );
-        $elem = $createInfo->xpath("/doc/slist[@name='country_physical']/val[@image='/manimg/common/flag/" . strtoupper( $contact["location_country"] ) . ".png']");
-
-        $contact["location_country"] = (string)$elem[0]["key"];
-        $elem = $createInfo->xpath("/doc/slist[@name='country_legal']/val[@image='/manimg/common/flag/" . strtoupper( $contact["postal_country"] ) . ".png']");
-
-        $contact["postal_country"] = (string)$elem[0]["key"];
+        if(isset( $contact["location_country"] )) {
+            $elem = $createInfo->xpath("/doc/slist[@name='country_physical']/val[@image='/manimg/common/flag/" . strtoupper( $contact["location_country"] ) . ".png']");
+            $contact["location_country"] = (string)$elem[0]["key"];
+        }
+        if(isset( $contact["postal_country"] )) {
+            $elem = $createInfo->xpath("/doc/slist[@name='country_legal']/val[@image='/manimg/common/flag/" . strtoupper( $contact["postal_country"] ) . ".png']");
+            $contact["postal_country"] = (string)$elem[0]["key"];
+        }
 
         $request = $contact;
         if(!isset($request["name"])) {
@@ -158,9 +203,10 @@ class Api{
      * @param $realname
      * @param $password
      * @param $projectId
+     * @param string $label
      * @return SimpleXMLElement
      */
-    public static function createAccount( $email, $countryISO, $realname, $password, $projectId ){
+    public static function createAccount( $email, $countryISO, $realname, $password, $projectId, $label = ""){
         $createInfo =  self::sendRequest( "account.edit" );
         $elem = $createInfo->xpath("/doc/slist/val[@image='/manimg/common/flag/" . strtoupper( $countryISO ) . ".png']");
 
@@ -171,6 +217,7 @@ class Api{
             "country" => $country,
             "realname" => $realname,
             "passwd" => $password,
+            "label" => $label,
             "notify" => "off",
             "employee" => "null",
             "sok" => "ok"
@@ -271,6 +318,23 @@ class Api{
         ));
     }
 
+    public static function domainNS( $domainId, $nservers = array()){
+        $request = array(
+            "elid" => $domainId,
+            "sok" => "ok",
+        );
+
+        for( $i=0; $i<4; $i++){
+            if( isset( $nservers[$i]) ) {
+                $request["ns$i"] = $nservers[$i];
+            } else {
+                $request["ns$i"] = "";
+            }
+        }
+
+        return self::sendRequest("domain.ns", $request);
+    }
+
     /**
      *
      * @param $domainName
@@ -278,22 +342,31 @@ class Api{
      * @param $accountId
      * @param $module
      * @param $priceId
+     * @param string $note
+     * @param null $project
+     * @param int $serviceStatus
      * @return SimpleXMLElement
      * @internal param $paymentId
      */
-    public static function importDomain( $domainName, $contactId, $accountId, $module, $priceId ){
+    public static function importDomain( $domainName, $contactId, $accountId, $module, $priceId, $note="", $project=null, $serviceStatus = 2 ){
 
-        $importResult = self::importDomainService($domainName,  $module, date("Y-m-d", strtotime("+10 month")));
+        $importResult = self::importDomainService($domainName,  $module, date("Y-m-d", strtotime("+12 month")));
 
         if(!isset($importResult->service_id) || (string)$importResult->service_id == ""){
             return $importResult;
         }
-        $pr = self::sendRequest( "processing.import.assign", array(
+        $assignRequest = array(
             "elid" => (string)$importResult->service_id,
             "account" => $accountId,
             "pricelist_" . (string)$importResult->service_id => $priceId,
             "sok" => "ok",
-        ));
+        );
+
+        if( $project != null ){
+            $assignRequest["project_" . (string)$importResult->service_id] = $project;
+        }
+
+        $pr = self::sendRequest( "processing.import.assign", $assignRequest);
         usleep(100000);
         $trys = 50;
         do {
@@ -301,13 +374,90 @@ class Api{
                 "elid" => (string)$importResult->service_id,
                 "service_profile_owner" => $contactId,
                 "service_profile_customer" => $contactId,
-                "expiredate" => date("Y-m-d", strtotime("+10 month")),
+                "expiredate" => date("Y-m-d", strtotime("+12 month")),
                 "status" => 2,
-                "service_status" => 2,
+                "service_status" => $serviceStatus,
                 "sok" => "ok"
             ));
             usleep(100000);
         }while( (string)$updateResult->doc->createdate == "" && --$trys>0);
+
+        if(trim($note) != ""){
+            self::sendRequest("domain.edit", array(
+                "elid" => (string)$importResult->service_id,
+                "note" => $note,
+                "sok" => "ok",
+                "su" => "registrar"
+            ));
+        }
+
+        //registrar
+
+        return $updateResult;
+    }
+
+    /**
+     *
+     * @param $domainName
+     * @param $contactsArray
+     * @param $accountId
+     * @param $module
+     * @param $priceId
+     * @param string $note
+     * @param null $project
+     * @return SimpleXMLElement
+     * @internal param $paymentId
+     */
+    public static function importDomainWithContacts( $domainName, $contactsArray, $accountId, $module, $priceId, $note="", $project=null ){
+        $importResult = self::importDomainService($domainName,  $module, date("Y-m-d", strtotime("+10 month")));
+
+        if(!isset($importResult->service_id) || (string)$importResult->service_id == ""){
+            return $importResult;
+        }
+        $editRequest = array(
+            "elid" => (string)$importResult->service_id,
+            "expiredate" => date("Y-m-d", strtotime("+10 month")),
+            "status" => 2,
+            "service_status" => 2,
+            "sok" => "ok"
+        );
+
+
+        $assignRequest = array(
+            "elid" => (string)$importResult->service_id,
+            "account" => $accountId,
+            "pricelist_" . (string)$importResult->service_id => $priceId,
+            "sok" => "ok",
+        );
+
+        if( $project != null ){
+            $assignRequest["project_" . (string)$importResult->service_id] = $project;
+        }
+
+        $pr = self::sendRequest( "processing.import.assign", $assignRequest);
+
+
+        foreach ($contactsArray as $name => $id) {
+            static::assignDomainContact( (string)$importResult->service_id,$id, $name);
+            //$editRequest["service_profile_$name"] = $id;
+        }
+
+        usleep(100000);
+        $trys = 50;
+        do {
+            $updateResult = self::sendRequest("domain.edit", $editRequest);
+            usleep(100000);
+        }while( (string)$updateResult->doc->createdate == "" && --$trys>0);
+
+        if(trim($note) != ""){
+            self::sendRequest("domain.edit", array(
+                "elid" => (string)$importResult->service_id,
+                "note" => $note,
+                "sok" => "ok",
+                "su" => "registrar"
+            ));
+        }
+        \logger::dump("Importing result", $updateResult);
 
         return $updateResult;
     }
@@ -460,7 +610,7 @@ class Api{
         $email, $phone, $mobile, $fax, $passportSeries, $passportOrg, $passportDateYMD, $birthdateYMD,
         $locationCountryISO, $locationState, $locationPostcode, $locationCity, $locationAddress,
         $postalCountryISO, $postalState, $postalPostcode, $postalCity, $postalAddress, $postalPerson
-){
+    ){
         $createInfo =  self::sendRequest( "service_profile.edit" );
 
         $elem = $createInfo->xpath("/doc/slist[@name='location_country']/val[@image='/manimg/common/flag/" . strtoupper( $locationCountryISO ) . ".png']");
@@ -542,7 +692,7 @@ class Api{
         $email, $phone, $mobile, $fax, $passportSeries, $passportOrg, $passportDateYMD, $birthdateYMD,
         $locationCountryISO, $locationState, $locationPostcode, $locationCity, $locationAddress,
         $postalCountryISO, $postalState, $postalPostcode, $postalCity, $postalAddress, $postalPerson, $inn
-){
+    ){
         $createInfo =  self::sendRequest( "service_profile.edit" );
 
         $elem = $createInfo->xpath("/doc/slist[@name='location_country']/val[@image='/manimg/common/flag/" . strtoupper( $locationCountryISO ) . ".png']");
@@ -594,7 +744,7 @@ class Api{
         $lastnameRU, $firstname, $middlename, $lastname, $email, $phone, $mobile, $fax,
         $locationCountryISO, $locationState, $locationPostcode, $locationCity, $locationAddress,
         $postalCountryISO, $postalState, $postalPostcode, $postalCity, $postalAddress, $postalPerson
-){
+    ){
         $createInfo =  self::sendRequest( "service_profile.edit" );
 
         $elem = $createInfo->xpath("/doc/slist[@name='location_country']/val[@image='/manimg/common/flag/" . strtoupper( $locationCountryISO ) . ".png']");
@@ -818,7 +968,7 @@ class Api{
      * @return SimpleXMLElement
      */
     public static function createNotification( $userId, $subject, $message ){
-        return self::sendRequest("notification.edit", array(
+        return static::sendRequest("notification.edit", array(
             "subject" => $subject,
             "message" => $message,
             "user" => $userId,
@@ -837,6 +987,13 @@ class Api{
         return self::sendRequest("task.simple.create", array("elid"=>$departmentId, "specification" => $message, "sok"=> "ok"));
     }
 
+    public static function deleteTask($elidTask ){
+        return self::sendRequest("task.delete", array("elid"=>$elidTask));
+    }
+    public static function deleteTasks($elidTasks ){
+        $elidTasks = implode(", " , $elidTasks);
+        return self::sendRequest("task.delete", array("elid"=>$elidTasks));
+    }
     /**
      *
      * @param $runningOperationId
@@ -917,6 +1074,16 @@ class Api{
     }
 
     /**
+     * @param $pricelistId
+     * @return SimpleXMLElement
+     */
+    public static function getPriceDetails($pricelistId ){
+        return self::sendRequest("pricelist.detail",array(
+            "elid" => $pricelistId
+        ));
+    }
+
+    /**
      * @param $accountId
      * @return SimpleXMLElement
      */
@@ -961,6 +1128,14 @@ class Api{
                 "sok" => "ok",
             )
         );
+    }
+
+    /**
+     * @param $module_id
+     * @return SimpleXMLElement
+     */
+    public static function getFraudGatewayInfo( $module_id ){
+        return self::sendRequest("fraud_gateway.edit", array("elid"=>$module_id));
     }
 
     /**
@@ -1052,6 +1227,18 @@ class Api{
         return self::sendRequest( $service . ".edit", $params );
     }
 
+
+    /**
+     * @param $serviceId
+     * @param $params
+     * @return SimpleXMLElement
+     */
+    public static function setServiceParam( $serviceId, $params ){
+        $params["elid"] = $serviceId;
+        $params["sok"] = "ok";
+        return self::sendRequest( "service.saveparam", $params );
+    }
+
     /**
      * @param $service
      * @param $domain_id
@@ -1100,6 +1287,19 @@ class Api{
         return self::sendRequest( $serviceName . ".open", array("elid"=>$id, "sok" => "ok"));
     }
 
+    public static function getCC($id) {
+        $profile = self::sendRequest("service_profile.edit");
+        $xpath_result = $profile->xpath("/doc/slist[@name='location_country']/val[@key='" . $id . "']");
+        $iso2_params = array();
+        if(isset($xpath_result[0]) &&
+            $xpath_result[0] instanceof SimpleXMLElement){
+            $attrs = $xpath_result[0]->attributes();
+            $iso2_params =  explode("/", (string)($attrs["image"]));
+            $iso2_params =explode(".", end( $iso2_params ));
+        }
+        return trim($iso2_params[0]);
+    }
+
 
 
     /**
@@ -1113,6 +1313,7 @@ class Api{
 
         $out = array(
             "ctype" => $profile->profiletype == 2 ? "company" : "person",
+            "profiletype" => (string)$profile->profiletype,
         );
 
         $simpleReplaceFormat = array(
@@ -1132,6 +1333,14 @@ class Api{
             $attrs = $xpath_result[0]->attributes();
             $iso2_params =  explode("/", (string)($attrs["image"]));
             $iso2_params =explode(".", end( $iso2_params ));
+        }
+        $xpath_result = $profile->xpath("/doc/slist[@name='postal_country']/val[@key='" . (string)$profile->postal_country . "']");
+        if(isset($xpath_result[0]) &&
+            $xpath_result[0] instanceof SimpleXMLElement){
+            $attrs = $xpath_result[0]->attributes();
+            $iso2_postal_params =  explode("/", (string)($attrs["image"]));
+            $iso2_postal_params =explode(".", end( $iso2_postal_params ));
+            $out["iso2_postal"] = trim($iso2_postal_params[0]);
         }
 
         $externalInfo = self::sendRequest("service_profile2processingmodule");
@@ -1168,19 +1377,15 @@ class Api{
         for( $i=0; $i<4; $i++ ){
             $nsname = "ns$i";
             if( $result->$nsname != "" ){
-                $params = explode( "/", $result->$nsname );
+                $nss[] = self::string2Ns((string)$result->$nsname);
+            }
+        }
 
-                if(count($params) > 1){
-                    $ns = array(
-                        "ns" => $params[0],
-                        "ip" => $params[1],
-                    );
-                } else {
-                    $ns = array(
-                        "ns" => $params[0],
-                    );
-                }
-                $nss[] = $ns;
+        if( isset( $result->ns_additional ) && trim( (string)$result->ns_additional ) ){
+            $additionalNss = explode(" ", (string)$result->ns_additional);
+
+            foreach ( $additionalNss as $nsString){
+                $nss[] = self::string2Ns( $nsString );
             }
         }
 
@@ -1188,6 +1393,23 @@ class Api{
     }
 
 
+    public static function string2Ns( $string ){
+        $params = explode( "/", $string );
+
+        if(count($params) > 1){
+            $ns = array(
+                "ns" => $params[0],
+                "ip" => $params[1],
+            );
+        } else {
+            $ns = array(
+                "ns" => $params[0],
+            );
+        }
+        $ns["hostparams"] = $params;
+
+        return $ns;
+    }
     /**
      * @param $domain_id
      * @return array
@@ -1236,16 +1458,71 @@ class Api{
         foreach ($params as $key => $value){
             $params_line[] ="$key=" . escapeshellarg($value);
         }
+
         $command = \Config::$MGRCTLPATH . " -o $out -m billmgr " . $method . " " . implode( " ", $params_line );
         \logger::dump("CallBillmgrApi", $command, \logger::LEVEL_ISP_REQUEST);
 
+        $trys = 30;
+        do{
+            $apiLocked = self::tryLock();
+            if(!$apiLocked){
+                sleep(1);
+            }
+        }while( !$apiLocked && $trys-- > 0 );
+
         $result = shell_exec( $command );
+
+        if($apiLocked){
+            self::unLock();
+        }
 
         \logger::dump("Result", $result, \logger::LEVEL_ISP_RESULT);
 
         return new SimpleXMLElement($result);
     }
 
+    protected static function unLock(){
+    }
 
+    protected static function tryLock(){
+        return true;
+    }
 
+    /**
+     * @param $docId
+     * @param $item
+     * @return \SimpleXMLElement
+     * @throws Exception
+     */
+    public static function domainDocVerified($docId , $item , $adminID){
+        $out =  static::sendRequest("domain.doc.verified", array(
+            "elid" => $docId,
+            "plid" => $item,
+            "su" => $adminID ,
+        ));
+        $ok = $out->xpath("//tparams");
+        $err =  $out->xpath("//error");
+        if(empty($ok) || !empty($err)){
+            Api::getError($out);
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param SimpleXMLElement $xml
+     * @throws Exception
+     */
+    private static function getError($xml){
+        $error = $xml->xpath("//error/msg");
+
+        if(!empty($error)){
+            $msg = trim((string)$error);
+            \logger::dump("error" ,$msg , \logger::LEVEL_ERROR );
+            throw new Exception($msg);
+        }
+        \logger::dump("error" ,$xml->asXML() , \logger::LEVEL_ERROR );
+        \logger::write("domain.doc.verified error error" , \logger::LEVEL_ERROR );
+        throw new Exception("domain.doc.verified error");
+    }
 }

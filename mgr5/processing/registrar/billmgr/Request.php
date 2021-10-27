@@ -4,11 +4,12 @@ namespace Billmgr;
 class Request{
 
     private static $instance;
-    public static function readStdIn(){
+    public static function readStdIn( $waitInput = false ){
         $xml = "";
         $stdin = fopen("php://stdin", "r");
         stream_set_blocking($stdin, false);
-        if( ($buffer = fgets($stdin, 1000)) !== false) {
+        $buffer = "";
+        if( $waitInput || ( $buffer = fgets($stdin, 1000)) !== false) {
             $xml .= $buffer;
             while (!feof($stdin)) {
                 $buffer = fgets($stdin, 1000);

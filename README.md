@@ -18,8 +18,22 @@ Plugin for Billmanager5 integration with openprovider
 > Note: BILLMGR_PATH almost always is /usr/local/mgr5
 
 3. Mark "addon/domainauthcode.php" and "addon/pmopenprovider" as executables (chmod +x)
-3. Restart billmanager to commit changes (killall core)
-4. Done
+4. Create required tables by executing queries:
+```sql
+CREATE TABLE IF NOT EXISTS `processingcache` (
+    `id` int(11) NOT NULL,
+    `processingmodule` varchar(255) NOT NULL,
+    `actualuntil` datetime NOT NULL,
+    `key` varchar(255) NOT NULL,
+    `value` text DEFAULT NULL
+    ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=latin1;
+
+ALTER TABLE `processingcache`
+    ADD PRIMARY KEY (`id`);
+
+```
+5. Restart billmanager to commit changes (killall core)
+6. Done
 
 
 You can find the detailed guide to setting up the domain name provider modules by going to the link below:

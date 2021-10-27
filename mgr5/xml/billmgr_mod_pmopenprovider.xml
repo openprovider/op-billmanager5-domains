@@ -10,6 +10,129 @@
         <msg name="desc_full" lang="ru">Openprovider модуль</msg>
         <msg name="desc_full" lang="en">Openprovider module</msg>
     </plugin>
+    <metadata name="domain.pmopenprovider.ca" type="form">
+        <form>
+            <field name="legalType" required="yes">
+                <select name="legalType" required="yes"/>
+            </field>
+        </form>
+    </metadata>
+    <metadata name="domain.pmopenprovider.bank" type="form">
+        <form>
+            <field name="ftldToken" required="yes">
+                <input name="ftldToken" type="text" required="yes"/>
+            </field>
+        </form>
+    </metadata>
+    <metadata name="domain.pmopenprovider.barcelona" type="form">
+        <form>
+            <field name="trademarkId">
+                <input name="trademarkId" type="text"/>
+            </field>
+            <field name="intendedUse" required="yes">
+                <input name="intendedUse" type="text" required="yes"/>
+            </field>
+        </form>
+    </metadata>
+
+    <metadata name="domain.pmopenprovider.cat" type="form">
+        <form>
+            <field name="intendedUse" required="yes">
+                <input name="intendedUse" type="text" required="yes"/>
+            </field>
+        </form>
+    </metadata>
+
+    <metadata name="domain.pmopenprovider.hu" type="form">
+        <form>
+            <field name="passportNumber">
+                <input name="passportNumber" type="text"/>
+            </field>
+            <field name="vat">
+                <input name="vat" type="text"/>
+            </field>
+        </form>
+    </metadata>
+
+    <metadata name="domain.pmopenprovider.insurance" type="form">
+        <form>
+            <field name="ftldToken" required="yes">
+                <input name="ftldToken" type="text" required="yes"/>
+            </field>
+        </form>
+    </metadata>
+
+    <metadata name="domain.pmopenprovider.kr" type="form">
+        <form>
+            <field name="customerUin" required="yes">
+                <input name="customerUin" type="text" required="yes"/>
+            </field>
+        </form>
+    </metadata>
+
+    <metadata name="domain.pmopenprovider.madrid" type="form">
+        <form>
+            <field name="trademarkId">
+                <input name="trademarkId" type="text"/>
+            </field>
+            <field name="intendedUse" required="yes">
+                <input name="intendedUse" type="text" required="yes"/>
+            </field>
+        </form>
+    </metadata>
+    <metadata name="domain.pmopenprovider.no" type="form">
+        <form>
+            <field name="companyRegistrationNumber">
+                <input name="companyRegistrationNumber" type="text"/>
+            </field>
+        </form>
+    </metadata>
+    <metadata name="domain.pmopenprovider.radio" type="form">
+        <form>
+            <field name="intendedUse">
+                <input name="intendedUse" type="text"/>
+            </field>
+        </form>
+    </metadata>
+    <metadata name="domain.pmopenprovider.ro" type="form">
+        <form>
+            <field name="companyRegistrationNumber">
+                <input name="companyRegistrationNumber" type="text"/>
+            </field>
+        </form>
+    </metadata>
+    <metadata name="domain.pmopenprovider.sg" type="form">
+        <form>
+            <field name="adminSingPassId">
+                <input name="adminSingPassId" type="text"/>
+            </field>
+            <field name="companyRegistrationNumber">
+                <input name="companyRegistrationNumber" type="text"/>
+            </field>
+        </form>
+    </metadata>
+    <metadata name="domain.pmopenprovider.sport" type="form">
+        <form>
+            <field name="intendedUse" required="yes">
+                <input name="intendedUse" type="text" required="yes"/>
+            </field>
+        </form>
+    </metadata>
+    <metadata name="domain.pmopenprovider.swiss" type="form">
+        <form>
+            <field name="intendedUse" required="yes">
+                <input name="intendedUse" type="text" required="yes"/>
+            </field>
+        </form>
+    </metadata>
+    <metadata name="domain.pmopenprovider.xxx" type="form">
+        <form>
+            <field name="membershipId">
+                <input name="membershipId" type="text"/>
+            </field>
+        </form>
+    </metadata>
+
     <metadata name="processing.edit.pmopenprovider" type="form">
         <form>
             <page name="connect">
@@ -30,25 +153,182 @@
             <msg name="pmopenprovider">Openprovider</msg>
             <msg name="module_pmopenprovider">Openprovider module</msg>
         </messages>
-
+        <messages name="domain.pmopenprovider.bank">
+            <msg name="ftldToken">fTLD Token</msg>
+            <msg name="hint_ftldToken">fTLD token required for registration and data in owner handle must be exactly the same as in token. You need to request token from registry</msg>
+        </messages>
+        <messages name="domain.pmopenprovider.barcelona">
+            <msg name="trademarkId">Trademark Id</msg>
+            <msg name="hint_trademarkId">Local trademark ID required for Local Trademark phase</msg>
+            <msg name="intendedUse">Intended Use</msg>
+            <msg name="hint_intendedUse">Intended use value should contain information on how the domain name will be used</msg>
+        </messages>
         <messages name="processing.edit.pmopenprovider">
             <msg name="url">Url</msg>
-            <msg name="hint_url">API URL</msg>
+            <msg name="hint_url">Virtual registrar API URL</msg>
             <msg name="login">Login</msg>
             <msg name="hint_login">Login</msg>
             <msg name="password">Password</msg>
             <msg name="hint_password">Password</msg>
         </messages>
+
+        <messages name="domain.pmopenprovider.ca">
+            <msg name="legalType">Legal Type</msg>
+            <msg name="hint_legalType">Legal type</msg>
+        </messages>
+        <messages name="domain.pmopenprovider.cat">
+            <msg name="intendedUse">Intended Use</msg>
+            <msg name="hint_intendedUse">IntendedUse value must contain information on how the domain name will be used</msg>
+        </messages>
+        <messages name="domain.pmopenprovider.hu">
+            <msg name="passportNumber">Passport Number</msg>
+            <msg name="hint_passportNumber">Passport number. Required in case if domain requester is a private individual</msg>
+            <msg name="vat">Vat number</msg>
+            <msg name="hint_vat">Vat number. Required in case if domain requester is a legal entity</msg>
+        </messages>
+        <messages name="domain.pmopenprovider.insurance">
+            <msg name="ftldToken">fTLD Token</msg>
+            <msg name="hint_ftldToken">fTLD token required for registration and data in owner handle must be exactly the same as in token. You need to request token from registry</msg>
+        </messages>
+        <messages name="domain.pmopenprovider.kr">
+            <msg name="customerUin">Customer UIN</msg>
+            <msg name="hint_customerUin">KR Identify number</msg>
+        </messages>
+        <messages name="domain.pmopenprovider.madrid">
+            <msg name="trademarkId">Trademark ID</msg>
+            <msg name="hint_trademarkId">Local trademark ID required for Local Trademark phase</msg>
+            <msg name="intendedUse">Intended Use</msg>
+            <msg name="hint_intendedUse">Intended use value should contain information on how the domain name will be used</msg>
+        </messages>
+        <messages name="domain.pmopenprovider.no">
+            <msg name="companyRegistrationNumber">Company Registration Number</msg>
+            <msg name="hint_companyRegistrationNumber">Company registration number. Required in case if domain requester is a legal entity</msg>
+        </messages>
+        <messages name="domain.pmopenprovider.radio">
+            <msg name="intendedUse">Intended Use</msg>
+            <msg name="hint_intendedUse">Intended Use value should contain information on how the domain name will be used</msg>
+        </messages>
+        <messages name="domain.pmopenprovider.ro">
+            <msg name="companyRegistrationNumber">Company Registration Number</msg>
+            <msg name="hint_companyRegistrationNumber">Company registration number. Required in case if domain requester is a legal entity</msg>
+        </messages>
+        <messages name="domain.pmopenprovider.sg">
+            <msg name="adminSingPassId">Admin SingPass ID</msg>
+            <msg name="hint_adminSingPassId">If the admin contact is a natural person located in Singapore, the corresponding Singapore Personal Access ID has to be given.
+                The format of the SingPassID is:
+                X1234567X - where X is an upper case letter at the beginning and end of a seven digit string
+                In case of a foreign organization, it is possible to use the SGNICID:
+                SGNICID-X12-345678 - the SGNICID will look like this example
+            </msg>
+            <msg name="companyRegistrationNumber">Company Registration Number</msg>
+            <msg name="hint_companyRegistrationNumber">For companies located in Singapore, the corresponding company registration number has to be given.
+                For Singapore citizens and permanent residents, please provide NRIC or Passport No.
+                For Singapore companies, please provide RCBID as it appears in RCB Certificate.
+                For Singapore societies, please provide RCBID as it appears in ROS Certificate.
+            </msg>
+        </messages>
+        <messages name="domain.pmopenprovider.sport">
+            <msg name="intendedUse">Intended Use</msg>
+            <msg name="hint_intendedUse">Intended use value should contain information on how the domain name will be used
+            </msg>
+        </messages>
+        <messages name="domain.pmopenprovider.swiss">
+            <msg name="intendedUse">Intended Use</msg>
+            <msg name="hint_intendedUse">Intended use value should contain information on how the domain name will be used</msg>
+        </messages>
+        <messages name="domain.pmopenprovider.xxx">
+            <msg name="membershipId">Membership ID</msg>
+            <msg name="hint_membershipId">membershipId value cannot be empty</msg>
+        </messages>
     </lang>
 
     <lang name="ru">
+        <messages name="domain.pmopenprovider.xxx">
+            <msg name="membershipId">Membership ID</msg>
+            <msg name="hint_membershipId">membershipId value cannot be empty</msg>
+        </messages>
+        <messages name="domain.pmopenprovider.swiss">
+            <msg name="intendedUse">Intended Use</msg>
+            <msg name="hint_intendedUse">Intended use value should contain information on how the domain name will be used</msg>
+        </messages>
+        <messages name="domain.pmopenprovider.sport">
+            <msg name="intendedUse">Intended Use</msg>
+            <msg name="hint_intendedUse">Intended use value should contain information on how the domain name will be used
+            </msg>
+        </messages>
+        <messages name="domain.pmopenprovider.sg">
+            <msg name="adminSingPassId">Admin SingPass ID</msg>
+            <msg name="hint_adminSingPassId">If the admin contact is a natural person located in Singapore, the corresponding Singapore Personal Access ID has to be given.
+                The format of the SingPassID is:
+                X1234567X - where X is an upper case letter at the beginning and end of a seven digit string
+                In case of a foreign organization, it is possible to use the SGNICID:
+                SGNICID-X12-345678 - the SGNICID will look like this example
+            </msg>
+            <msg name="companyRegistrationNumber">Company Registration Number</msg>
+            <msg name="hint_companyRegistrationNumber">For companies located in Singapore, the corresponding company registration number has to be given.
+                For Singapore citizens and permanent residents, please provide NRIC or Passport No.
+                For Singapore companies, please provide RCBID as it appears in RCB Certificate.
+                For Singapore societies, please provide RCBID as it appears in ROS Certificate.
+            </msg>
+        </messages>
+        <messages name="domain.pmopenprovider.ro">
+            <msg name="companyRegistrationNumber">Company Registration Number</msg>
+            <msg name="hint_companyRegistrationNumber">Company registration number. Required in case if domain requester is a legal entity</msg>
+        </messages>
+        <messages name="domain.pmopenprovider.radio">
+            <msg name="intendedUse">Intended Use</msg>
+            <msg name="hint_intendedUse">Intended Use value should contain information on how the domain name will be used</msg>
+        </messages>
+        <messages name="domain.pmopenprovider.no">
+            <msg name="companyRegistrationNumber">Company Registration Number</msg>
+            <msg name="hint_companyRegistrationNumber">Company registration number. Required in case if domain requester is a legal entity</msg>
+        </messages>
+        <messages name="domain.pmopenprovider.madrid">
+            <msg name="trademarkId">Trademark ID</msg>
+            <msg name="hint_trademarkId">Local trademark ID required for Local Trademark phase</msg>
+            <msg name="intendedUse">Intended Use</msg>
+            <msg name="hint_intendedUse">Intended use value should contain information on how the domain name will be used</msg>
+        </messages>
+        <messages name="domain.pmopenprovider.kr">
+            <msg name="customerUin">Customer UIN</msg>
+            <msg name="hint_customerUin">KR Identify number</msg>
+        </messages>
+        <messages name="domain.pmopenprovider.insurance">
+            <msg name="ftldToken">fTLD Token</msg>
+            <msg name="hint_ftldToken">fTLD token required for registration and data in owner handle must be exactly the same as in token. You need to request token from registry</msg>
+        </messages>
+        <messages name="domain.pmopenprovider.hu">
+            <msg name="passportNumber">Passport Number</msg>
+            <msg name="hint_passportNumber">Passport number. Required in case if domain requester is a private individual</msg>
+            <msg name="vat">Vat number</msg>
+            <msg name="hint_vat">Vat number. Required in case if domain requester is a legal entity</msg>
+        </messages>
+        <messages name="domain.pmopenprovider.cat">
+            <msg name="intendedUse">Intended Use</msg>
+            <msg name="hint_intendedUse">IntendedUse value must contain information on how the domain name will be used</msg>
+        </messages>
+        <messages name="domain.pmopenprovider.ca">
+            <msg name="legalType">Legal Type</msg>
+            <msg name="hint_legalType">Legal type</msg>
+        </messages>
+
+        <messages name="domain.pmopenprovider.bank">
+            <msg name="ftldToken">fTLD Token</msg>
+            <msg name="hint_ftldToken">fTLD token required for registration and data in owner handle must be exactly the same as in token. You need to request token from registry</msg>
+        </messages>
         <messages name="label_processing_modules">
             <msg name="pmopenprovider">Openprovider</msg>
             <msg name="module_pmopenprovider">Интеграция с Openprovider</msg>
         </messages>
+        <messages name="domain.pmopenprovider.barcelona">
+            <msg name="trademarkId">Trademark Id</msg>
+            <msg name="hint_trademarkId">Local trademark ID required for Local Trademark phase</msg>
+            <msg name="intendedUse">Intended Use</msg>
+            <msg name="hint_intendedUse">Intended use value should contain information on how the domain name will be used</msg>
+        </messages>
         <messages name="processing.edit.pmopenprovider">
             <msg name="url">Url</msg>
-            <msg name="hint_url">API URL</msg>
+            <msg name="hint_url">API URL виртуального регистратора</msg>
             <msg name="login">Login</msg>
             <msg name="hint_login">Login</msg>
             <msg name="password">Password</msg>

@@ -50,7 +50,7 @@ class AuthCode extends Billmgr\Response{
     protected function makeXMLParams() {
         $xml = $this->getEmptyXML();
 
-        $xml->addChild("authcode", $this->getAuthCode());
+        $xml->addChild("authcode", htmlspecialchars($this->getAuthCode()));
 
         return $xml;
     }

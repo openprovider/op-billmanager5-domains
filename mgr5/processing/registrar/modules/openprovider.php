@@ -1,9 +1,25 @@
 <?php
 namespace Modules;
+use Billmgr\DomainAlreadyRegistered;
+use Billmgr\PremiumDomainException;
+use Billmgr\ProlongUnavailableException;
+use Billmgr\RestoreRequiredException;
+
 require_once __DIR__ . "/library/openprovider.php";
 
+/**
+ * Class openprovider
+ *
+ * @see https://doc.openprovider.eu/Main_Page
+ * @package Modules
+ */
 class openprovider extends Registrar{
+    const SOFT_QUARANTINE = "softRestorePrice";
+    const HARD_QUARANTINE = "restorePrice";
 
+    const EXCLUDED_ADDITIONAL_FIELDS = array(
+        "idnScript"
+    );
 
     function __construct( $RegInfo ){
         $this->auth_info = array(
@@ -24,10 +40,10 @@ class openprovider extends Registrar{
             $info = $this->sendCatchedRequest("retrieveExtensionRequest_" . $contactTypes->getTld(),
                 "retrieveExtensionRequest",
                 array(
-                'withPrice' => 0,
-                'withDescription' => 0,
-                'name' => $idna->encode($contactTypes->getTld()),
-            ));
+                    'withPrice' => 0,
+                    'withDescription' => 0,
+                    'name' => $idna->encode($contactTypes->getTld()),
+                ));
 
             $contactTypes->setAuthCode( $info["isTransferAuthCodeRequired"] == "yes" );
             if( $info["billingHandleEnabled"] == 1 ){
@@ -38,45 +54,55 @@ class openprovider extends Registrar{
         }
     }
 
+    public function getTunService(\Billmgr\Responses\TuneDomainService $domainParams){
+        \logger::write("open getTunService");
+        if($domainParams->getTld() != null){
+            $additionalFields = $this->getDomainAdditionalFields($domainParams->getTld());
+
+            \logger::dump("getCustomerAdditionalFields" , $additionalFields);
+            if(!empty($additionalFields)){
+                foreach ($additionalFields as $contactProperty){
+                    if( in_array($contactProperty["name"], static::EXCLUDED_ADDITIONAL_FIELDS ) ){
+                        continue;
+                    }
+                    if($contactProperty["type"] == "select"){
+                        $values = array();
+                        if(!isset($contactProperty["required"]) || $contactProperty["required"] != 1){
+                            $values[ "" ] = "Not selected";
+                        }
+                        foreach ($contactProperty["options"] as $options){
+                            $values[$options["value"]] = $options["description"];
+                        }
+
+                        $domain = explode(".", $domainParams->getDomain()->getPunycode());
+                        $namesLists = array("main_domain_" . $contactProperty["name"] ,
+                            "domainparam_" . $domain[0] ."____________" . $domainParams->getTld() ."_" . $contactProperty["name"] );
+                        $domainParams->addsLists( $namesLists, $values);
+
+                        /*
+                        $domainParams->addSelectField($contactProperty["name"] , $values ,isset($contactProperty["required"]) && $contactProperty["required"] == 1,
+                            isset( $contactProperty["label"]) ? $contactProperty["label"] : $contactProperty["description"], $contactProperty["description"]);
+                        */
+                    }
+                }
+            }
+        }
+
+    }
 
     /**
      * @param \Billmgr\Responses\TuneServiceProfile $profile
      */
     public function tunProfile(\Billmgr\Responses\TuneServiceProfile $profile ){
+
         if( $profile->getTld() != null ){
 
-            $additionalFields = $this->getAdditionalFields( $profile->getTld() );
-            foreach ( $additionalFields["domain"] as $contactProperty ){
-                if($contactProperty["type"] == "select"){
-                    $options = array();
-
-                    if(!isset($contactProperty["required"]) || $contactProperty["required"] != 1){
-                        $options[ "" ] = "Not selected";
-                    }
-
-                    foreach ( $contactProperty["options"] as $option ){
-                        $options[ $option["value"] ] = $option["description"];
-                    }
-
-                    $profile->addAdditionalSelectField(
-                        $contactProperty["name"],
-                        $options,
-                        isset($contactProperty["required"]) && $contactProperty["required"] == 1,
-                        $contactProperty["description"],
-                        $contactProperty["description"]
-                    );
-                } else {
-                    $profile->addAdditionalInputField(
-                        $contactProperty["name"],
-                        "",
-                        isset($contactProperty["required"]) && $contactProperty["required"] == 1,
-                        $contactProperty["label"],
-                        $contactProperty["description"]
-                    );
+            $additionalFields = $this->getCustomerAdditionalFields( $profile->getTld() );
+            \logger::dump("additionalFields",  $additionalFields);
+            foreach ( $additionalFields as $contactProperty ){
+                if( in_array($contactProperty["name"], static::EXCLUDED_ADDITIONAL_FIELDS ) ){
+                    continue;
                 }
-            }
-
-            foreach ( $additionalFields["customer"] as $contactProperty ){
                 if($contactProperty["type"] == "select"){
                     $options = array();
 
@@ -88,7 +114,7 @@ class openprovider extends Registrar{
                         $contactProperty["name"],
                         $options,
                         isset($contactProperty["required"]) && $contactProperty["required"] == 1,
-                        $contactProperty["description"],
+                        isset( $contactProperty["label"]) ? $contactProperty["label"] : $contactProperty["name"],
                         $contactProperty["description"]
                     );
                 } else {
@@ -96,12 +122,49 @@ class openprovider extends Registrar{
                         $contactProperty["name"],
                         "",
                         isset($contactProperty["required"]) && $contactProperty["required"] == 1,
-                        $contactProperty["label"],
+                        isset( $contactProperty["label"]) ? $contactProperty["label"] : $contactProperty["name"],
                         $contactProperty["description"]
                     );
                 }
             }
         }
+    }
+
+    /**
+     * @param \Domain $domain
+     * @param bool $privacyStatus
+     * @return array
+     * @throws \Exception
+     */
+    public function setWhoisPrivacyProtection($domain, $privacyStatus ){
+
+
+        $domainInfo =  $this->info_domain($domain);
+
+
+        $out = array(
+            "result" => "success",
+        );
+
+        if( $domainInfo["whoisprivacy"] == $privacyStatus ){
+            $out["descr"] = "ALREADY_SAME_STATUS (" . json_encode($privacyStatus) . ")";
+        }else{
+
+            \logger::dump("SETTING WhoisPrivacyProtection!", $privacyStatus, \logger::LEVEL_INFO);
+            try {
+                $this->sendRequest("modifyDomainRequest", array(
+                    'domain' => $this->getDomainParams($domain),
+                    "isPrivateWhoisEnabled" => $privacyStatus ? 1 : 0,
+                ));
+            }catch (\Exception $ex) {
+                if (strpos($ex->getMessage(), "The domain is not in your account") !== false) {
+                    throw new \ClientException("Domain not found");
+                }
+                throw $ex;
+            }
+        }
+
+        return $out;
     }
 
 
@@ -188,18 +251,19 @@ class openprovider extends Registrar{
     /**
      * @see https://doc.openprovider.eu/index.php/API_Module_Domain_createDomainRequest
      *
-     * @param \Domain $domain
+     * @param \BillmanagerDomain $domain
      * @param $nss
      * @param $contact
      * @param int $period
      * @return array
      * @throws \ClientException
+     * @throws \Exception
      */
     public function reg_domain($domain, $nss, $contact, $period = 1){
         $out = array();
 
 
-        if( !isset($contact["contact_id"]) || $contact["contact_id"] == ""  ) {
+        if( !isset($contact["contact_id"]) || $contact["contact_id"] == "" || !$this->checkProfile($contact["contact_id"])  ) {
             $result = $this->create_contact( $contact );
 
             if( $result == false ) {
@@ -219,7 +283,7 @@ class openprovider extends Registrar{
                 if( isset($externalIds[ $additionalContact["id"] ]) ){
                     $contact[ $cType . "_id" ] = $externalIds[ $additionalContact["id"] ];
                 } else {
-                    if( !isset($additionalContact["contact_id"]) || $additionalContact["contact_id"] == ""  ) {
+                    if( !isset($additionalContact["contact_id"]) || $additionalContact["contact_id"] == "" || !$this->checkProfile($additionalContact["contact_id"])   ) {
                         $result = $this->create_contact($additionalContact);
 
                         if ($result == false) {
@@ -264,13 +328,14 @@ class openprovider extends Registrar{
         );
 
         $additionalFields = $this->getAdditionalFields( $request["domain"]["extension"] );
-
+        \logger::dump("domainAdditionalFields" , $domain->getExtendedFields() , \logger::LEVEL_DEBUG);
+        $domainAdditionalFields = $domain->getExtendedFields();
         foreach ($additionalFields["domain"] as $field ){
-            if( $contact["xml"] instanceof \SimpleXMLElement &&
-                isset($contact["xml"]->{ "additionaldomaininfo_" . $field["name"] }) &&
-                trim((string)$contact["xml"]->{ "additionaldomaininfo_" . $field["name"] }) != ""
-            ){
-                $request["additionalData"][$field["name"]] = (string)$contact["xml"]->{"additionaldomaininfo_" . $field["name"]};
+            if(isset($domainAdditionalFields[$field["name"]]) ){
+                $domainAdditionalFields[$field["name"]]  = trim($domainAdditionalFields[$field["name"]]);
+                if($domainAdditionalFields[$field["name"]] != ""){
+                    $request["additionalData"][$field["name"]] = (string)$domainAdditionalFields[$field["name"]];
+                }
             }
         }
 
@@ -296,7 +361,7 @@ class openprovider extends Registrar{
 
                 $contactInfo = $this->sendRequest("retrieveCustomerRequest", array(
                     "handle" => $externalId,
-                    "withAdditionalData" => 1,
+                    "withAdditionalData" => true,
                 ))->getValue();
 
                 $modifyRequest = array(
@@ -313,58 +378,213 @@ class openprovider extends Registrar{
                 }
 
 
+
+                $additionalDataValues = array();
                 foreach ($additionalFields["customer"] as $field){
                     if(
                         (!isset( $contactInfo["additionalData"][$field["name"]]) || trim($contactInfo["additionalData"][$field["name"]]) == "") &&
                         (!isset( $extensionData[$field["name"]] ) || trim($extensionData[$field["name"]]) == "")
                     ){
-                        if( $billmgrContact["xml"] instanceof \SimpleXMLElement &&
-                            isset($billmgrContact["xml"]->{$field["name"]}) &&
-                            trim((string)$billmgrContact["xml"]->{$field["name"]}) != ""
+                        if( !empty($billmgrContact["raw"]) &&
+                            isset($billmgrContact["raw"][$field["name"]]) &&
+                            trim((string)$billmgrContact["raw"][$field["name"]]) != ""
                         ) {
-                            $modifyRequest["extensionAdditionalData"][$request["domain"]["extension"]][$field["name"]] = (string)$contact["xml"]->{$field["name"]};
+                            $additionalDataValues[$field["name"]] = (string)$contact["raw"][$field["name"]];
+                            //$modifyRequest["extensionAdditionalData"][$request["domain"]["extension"]][$field["name"]] = (string)$contact["raw"][$field["name"]];
                         }
                     }
                 }
+                if( $domain->getTLD() == "es" &&
+                    !isset($additionalDataValues["companyRegistrationNumber"]) &&
+                    !isset($additionalDataValues["passportNumber"]) &&
+                    !isset($additionalDataValues["socialSecurityNumber"])
+                ){
+                    if( $contact["ctype"] == "company" ){
+                        $additionalDataValues["companyRegistrationNumber"] = $contact['inn'];
+                    } else {
+                        $additionalDataValues["passportNumber"] = $contact['passport_series'];
+                    }
+                }
 
-                if(!empty($modifyRequest["extensionAdditionalData"])){
+                if(!empty($additionalDataValues)){
+                    $modifyRequest["extensionAdditionalData"][] = array(
+                        "name" => $request["domain"]["extension"],
+                        "data" => $additionalDataValues
+                    );
                     $this->sendRequest("modifyCustomerRequest", $modifyRequest);
                 }
             }
         }
 
-        $this->sendRequest("createDomainRequest", $request);
+        try {
+            $this->sendRequest("createDomainRequest", $request);
+        }catch (\Exception $ex){
+
+            if( strpos($ex->getMessage(), "Your account balance is insufficient") !== false) {
+                throw new \TemporaryException($ex->getMessage(), 503, true);
+            }
+            if( strpos($ex->getMessage(), "Billing failure") !== false ){
+                \logger::write("OP_EXCEPTION: " . $ex->getMessage(), \logger::LEVEL_ERROR);
+                $ex = new \Exception("Bad reply");
+            }
+            if( strpos($ex->getMessage(), "Registry currently not reachable") !== false ){
+                \logger::write("OP_EXCEPTION: " . $ex->getMessage(), \logger::LEVEL_ERROR);
+                $ex = new \TemporaryException($ex->getMessage());
+            }
+            if( strpos($ex->getMessage(), "The domain you want to register is not free") !== false ){
+                \logger::write("OP_NOT_FREE: " . $ex->getMessage(), \logger::LEVEL_ERROR);
+
+                $ex = new DomainAlreadyRegistered( $domain);
+            }
+            if( strpos($ex->getMessage(), "register the premium domain") !== false ){
+                \logger::write("OP_NOT_FREE: (PREMIUM)" . $ex->getMessage(), \logger::LEVEL_ERROR);
+                $ex = new PremiumDomainException($domain);
+            }
+            if( strpos($ex->getMessage(), "A contact of type registrant should be located") !== false ){
+                preg_match("/(A contact of type registrant should be located[^\.]*)/", $ex->getMessage(), $matches );
+
+                $descr = isset($matches[1]) && trim($matches[1]) != "" ? trim($matches[1]) : "Unavailable country for TLD";
+                \logger::write("PROFILE_EXCEPTION: " . $ex->getMessage(), \logger::LEVEL_ERROR);
+                $ex = new \ProfileException($descr);
+                $ex->addProfileError( $contact["contact_id"], "location_country", $descr);
+            }
+
+            throw $ex;
+        }
+        $out["result"] = "success";
+
+        return $out;
+    }
+
+
+    /**
+     * @see https://doc.openprovider.eu/index.php/API_Module_Domain_renewDomainRequest
+     *
+     * @param \Domain $domain
+     * @param int $period
+     *
+     * @return array
+     * @throws ProlongUnavailableException
+     * @throws \TemporaryException
+     */
+    public function renew_domain($domain, $period = 1) {
+
+
+        $this->checkProlongUnavailable($domain);
+
+        $domainInfo = $this->getDomainInfo($domain);
+        $pricePeriodStatus = $this->getDomainPricePeriodStatus($domainInfo);
+        if ($pricePeriodStatus !== false){
+            $tldInfo = $this->getExtensionRequest($domain->getTLD() , $pricePeriodStatus);
+            $price = $tldInfo[$pricePeriodStatus]["reseller"]["price"];
+            if ($price == "0.00"){
+                $this->sendRequest("restoreDomainRequest", array( "domain" => $this->getDomainParams($domain)));
+
+                $out["result"] = "success";
+
+                return $out;
+            }else{
+                $currency = isset($tldInfo[$pricePeriodStatus]["reseller"]["currency"]) ? $tldInfo[$pricePeriodStatus]["reseller"]["currency"] : "";
+                $price = $price . " " . $currency;
+                \logger::write("RESTORE_PRICE: " . $price,\logger::LEVEL_INFO);
+                throw new RestoreRequiredException(500,$domain->getName());
+            }
+        }
+
+        try {
+            $this->sendRequest("renewDomainRequest", array(
+                "domain" => $this->getDomainParams($domain),
+                "period" => $period
+            ));
+        }catch (\Exception $exception ){
+            //restoreDomainRequest
+            if( strpos($exception->getMessage(), "Your account balance is insufficient") !== false) {
+                throw new \TemporaryException($exception->getMessage(), 503, true);
+            }
+            if( strpos($exception->getMessage(), "Deadline Exceeded") !== false) {
+                throw new \TemporaryException($exception->getMessage(), 503, true);
+            }
+            if( strpos($exception->getMessage(), "This domain cannot be renewed yet") !== false) {
+                $domainParams =  $this->getDomainParams($domain);
+
+                $info = $this->sendRequest("searchDomainRequest", array(
+                    'extension' => $domainParams["extension"],
+                    "domainNamePattern" => $domainParams["name"],
+                ) );
+                $info = $info->getValue();
+
+                foreach ($info["results"] as $result) {
+                    if (
+                        $result["domain"]["name"] . "." . $result["domain"]["extension"] == $domain->getName() ||
+                        $result["domain"]["name"] . "." . $result["domain"]["extension"] == $domain->getPunycode()
+                    ) {
+                        if(
+                            isset($result["renewalDate"]) &&
+                            trim($result["renewalDate"]) != "" &&
+                            strtotime($result["renewalDate"]) !== false &&
+                            strtotime($result["renewalDate"]) > time() &&
+                            date("Y-m-d") != date("Y-m-d", strtotime($result["renewalDate"]))
+                        ){
+                            throw new ProlongUnavailableException($result["renewalDate"],500,$domain->getName());
+                        }
+                        break;
+                    }
+                }
+
+                throw new \TemporaryException($exception->getMessage(), 503, false);
+            }else{
+                throw new $exception;
+            }
+        }
+
 
         $out["result"] = "success";
 
         return $out;
     }
 
+
     /**
-     * @see https://doc.openprovider.eu/index.php/API_Module_Domain_renewDomainRequest
-     *
-     * @param $domain
-     * @param int $period
-     *
-     * @return array
+     * @param string $profileId
+     * @return bool
      */
-    public function renew_domain($domain, $period = 1) {
+    private function checkProfile($profileId ){
+        try {
+            $profileInfo = $this->sendRequest("retrieveCustomerRequest", array(
+                "handle" => $profileId
+            ));
 
-        $this->sendRequest( "renewDomainRequest", array(
-            "domain" => $this->getDomainParams($domain),
-            "period" => $period
-        ));
+            $profileInfo = $profileInfo->getValue();
 
+            $checkingFields = array(
+                "name",
+                "address"
+            );
+            $profileOk = true;
 
-        $out["result"] = "success";
+            foreach ($checkingFields as $fieldName) {
+                foreach ($profileInfo[$fieldName] as $key => $value) {
+                    if ( $value != null && preg_match('/^[a-zA-Z0-9\W]+$/u', $value) === 0) {
+                        $profileOk = false;
+                        break;
+                    }
+                }
+                if (!$profileOk) {
+                    break;
+                }
+            }
+        }catch (\Exception $ex){
+            \logger::dump("Check profile $profileId failed", $ex->getMessage(), \logger::LEVEL_WARNING);
+            $profileOk = false;
+        }
 
-        return $out;
+        return $profileOk;
     }
 
     /**
      * @see https://doc.openprovider.eu/index.php/API_Module_Domain_transferDomainRequest
      *
-     * @param \Domain $domain
+     * @param \BillmanagerDomain $domain
      * @param $nss
      * @param $contact
      * @param $period
@@ -374,7 +594,7 @@ class openprovider extends Registrar{
      */
     public function transfer_domain($domain, $nss, $contact, $period, $params = array())
     {
-        if( !isset($contact["contact_id"]) || $contact["contact_id"] == ""  ) {
+        if( !isset($contact["contact_id"]) || $contact["contact_id"] == "" || !$this->checkProfile($contact["contact_id"])  ) {
             $result = $this->create_contact( $contact );
 
             if( $result == false ) {
@@ -394,7 +614,7 @@ class openprovider extends Registrar{
                 if( isset($externalIds[ $additionalContact["id"] ]) ){
                     $contact[ $cType . "_id" ] = $externalIds[ $additionalContact["id"] ];
                 } else {
-                    if( !isset($additionalContact["contact_id"]) || $additionalContact["contact_id"] == ""  ) {
+                    if( !isset($additionalContact["contact_id"]) || $additionalContact["contact_id"] == "" || !$this->checkProfile($additionalContact["contact_id"])  ) {
                         $result = $this->create_contact($additionalContact);
 
                         if ($result == false) {
@@ -484,10 +704,10 @@ class openprovider extends Registrar{
                         (!isset( $contactInfo["additionalData"][$field["name"]]) || trim($contactInfo["additionalData"][$field["name"]]) == "") &&
                         (!isset( $extensionData[$field["name"]] ) || trim($extensionData[$field["name"]]) == "")
                     ){
-                        if( $billmgrContact["xml"] instanceof \SimpleXMLElement &&
-                            isset($billmgrContact["xml"]->{$field["name"]})
+                        if( !empty($billmgrContact["raw"]) &&
+                            isset($billmgrContact["raw"][$field["name"]])
                         ) {
-                            $modifyRequest["extensionAdditionalData"][$request["domain"]["extension"]][$field["name"]] = (string)$contact["xml"]->{$field["name"]};
+                            $modifyRequest["extensionAdditionalData"][$request["domain"]["extension"]][$field["name"]] = (string)$contact["raw"][$field["name"]];
                         }
                     }
                 }
@@ -498,7 +718,23 @@ class openprovider extends Registrar{
             }
         }
 
-        $this->sendRequest("transferDomainRequest", $request );
+        try {
+            $this->sendRequest("transferDomainRequest", $request);
+        }catch (\Exception $ex){
+            if(strpos( $ex->getMessage(), "transferred less than 60 days") !== false ){
+                throw new \ClientException($ex->getMessage());
+            }
+            if( strpos($ex->getMessage(), "register the premium domain") !== false ){
+                \logger::write("OP_NOT_FREE: (PREMIUM)" . $ex->getMessage(), \logger::LEVEL_ERROR);
+                $ex = new PremiumDomainException($domain);
+            }
+
+            if(strpos( $ex->getMessage(), "Authorization code is incorrect or missing.") !== false ){
+                $authInfoCodeException =  new \AuthInfoCodeException("Authorization error: Invalid AuthInfo code", $domain->getName());
+                throw  $authInfoCodeException;
+            }
+            throw $ex;
+        }
 
 
         $out["result"] = "success";
@@ -538,6 +774,7 @@ class openprovider extends Registrar{
         }
 
 
+        \logger::dump("NewNSQ", $p_nss, \logger::LEVEL_DEBUG);
         try {
             $this->sendRequest("modifyDomainRequest", array(
                 'domain' => $this->getDomainParams($domain),
@@ -557,6 +794,42 @@ class openprovider extends Registrar{
 
         return $out;
 
+    }
+
+    /** @see https://doc.openprovider.eu/index.php/API_Module_Domain_searchDomainRequest
+     * @param $page
+     * @return \DomainInfo[]|bool
+     * @throws \Exception
+     */
+    public function getDomainsList($page) {
+        $domainsList = [];
+        $step = 1000;
+        $offset = ($page - 1) * $step;
+
+        $info = $this->sendRequest("searchDomainRequest", array(
+            'offset' => $offset,
+            "limit" => $step,
+        ));
+
+        if ($info == null || !($info instanceof \OP_Reply)) {
+            throw new \Exception("Unrecognized response from OPENPROVIDER");
+        } else {
+            $info = $info->getValue();
+
+            foreach ($info["results"] as $result) {
+                if($result['status'] != "DEL" && $result['status'] != "FAI") {
+                    $name = $result["domain"]["name"] . "." . $result["domain"]["extension"];
+                    $dinfo = new \DomainInfo(
+                        $name,
+                        $result["autorenew"] == "on",
+                        $this->decodeNs($result["nameServers"]),
+                        strtotime(trim($result["expirationDate"]))
+                    );
+                    $domainsList[$dinfo->getDomain()->getPunycode()] = $dinfo;
+                }
+            }
+            return empty($domainsList) ? false : $domainsList;
+        }
     }
 
     /**
@@ -592,24 +865,16 @@ class openprovider extends Registrar{
                     $result["domain"]["name"] . "." . $result["domain"]["extension"]  == $domain->getPunycode()
                 ){
                     $out["result"] = "success";
-                    $out["nss"] = array();
+                    $out["whoisprivacy"] = isset($result["isPrivateWhoisEnabled"]) && $result["isPrivateWhoisEnabled"] === "1";
+                    $out["nss"] = $this->decodeNs($result["nameServers"]);
 
-                    foreach( $result["nameServers"] as $ns ){
-                        $tmp = array(
-                            "ns" => $ns["name"]
-                        );
-
-                        if( isset($ns["ip"]) && $ns["ip"]!= null){
-                            $tmp["ip"] = $ns["ip"];
-                        }
-                        if( isset($ns["ip6"]) && $ns["ip6"]!= null){
-                            $tmp["ip"] = $ns["ip6"];
-                        }
-
-                        $out["nss"][] = $tmp;
-                    }
-
+                    /*if( isset($result["registryExpirationDate"]) && $result["registryExpirationDate"]!="" ){
+                        \logger::write("USING registryExpirationDate", \logger::LEVEL_INFO);
+                        $out["expire"] = strtotime( $result["registryExpirationDate"] );
+                    } else {*/
                     $out["expire"] = strtotime( $result["expirationDate"] );
+                    //}
+
 
 
                     if( empty($out["nss"]) ){
@@ -621,6 +886,8 @@ class openprovider extends Registrar{
                 }
             }
 
+            \logger::dump("SYNC_INFO", $out,\logger::LEVEL_INFO);
+
             if($out["result"] != "success"){
                 throw new \Exception("Domain not found", 404);
             }
@@ -630,8 +897,37 @@ class openprovider extends Registrar{
     }
 
 
+    private function decodeNs($in) {
+        $nss = [];
+        foreach( $in as $ns ){
+            $tmp = array(
+                "ns" => $ns["name"]
+            );
+
+            if( isset($ns["ip"]) && $ns["ip"]!= null){
+                $tmp["ip"] = $ns["ip"];
+            }
+            if( isset($ns["ip6"]) && $ns["ip6"]!= null){
+                $tmp["ip"] = $ns["ip6"];
+            }
+
+            $nss[] = $tmp;
+        }
+        return $nss;
+    }
+
+
     private function getPhoneParams($phone){
         preg_match("/(\+[0-9]+)\s*\(([0-9]+)\)\s*(.*)/", preg_replace("/\s/","",$phone), $matches);
+
+        if( count($matches) < 3 ){
+            $onlyNumbers = preg_replace("/[^0-9]/", "", preg_replace("/\s/","",$phone));
+            $matches = array(
+                1 => substr( $onlyNumbers, 0, 1),
+                2 => substr( $onlyNumbers, 1, 3),
+                3 => substr( $onlyNumbers, 4),
+            );
+        }
 
         return array(
             "countryCode" => $matches[1],
@@ -651,6 +947,7 @@ class openprovider extends Registrar{
      * @param \Domain $domain
      * @return array|bool
      * @throws \ClientException
+     * @throws \Exception
      */
     private function create_contact($contact, $domain = null) {
         $args = array(
@@ -685,7 +982,7 @@ class openprovider extends Registrar{
                 $args["name"] = array(
                     "initials" => $this->translit(mb_strtoupper( substr(trim($contact["firstname"]),0,1) . " " .  substr(trim($contact["middlename"]),0,1) , "utf-8")),
                     'firstName' => $this->translit($contact["firstname"]),
-                    'prefix' => $contact["middlename"],
+                    'prefix' => $this->translit($contact["middlename"]),
                     'lastName' => $this->translit($contact["lastname"]),
                 );
                 $series = $number = "";
@@ -755,6 +1052,7 @@ class openprovider extends Registrar{
                     ),
                 );
                 $args["companyName"] = $contact["company"];
+                //$args["vat"] = $contact['inn'];
                 /*$args["additionalData"] = array(
                     "companyRegistrationNumber" => $contact['inn'],
                 );*/
@@ -777,6 +1075,21 @@ class openprovider extends Registrar{
         try {
             $contact_id = $this->sendRequest( "createCustomerRequest", $args );
         } catch ( \Exception $ex ) {
+            if( $ex->getMessage() == "Bad reply"){
+                throw $ex;
+            }
+
+            if( strpos($ex->getMessage(), "Invalid zipcode") !== false ){
+                $ex = new \ProfileException("Invalid zipcode");
+                $ex->addProfileError( $contact["id"], isset($contact["pa_postcode"]) && trim( $contact["pa_postcode"] ) !="" ? "postal_postcode" : "location_postcode", "Invalid zipcode");
+                throw $ex;
+            }
+            if( strpos($ex->getMessage(), "Invalid street") !== false ){
+                $ex = new \ProfileException("Invalid street");//postal_address
+                $ex->addProfileError( $contact["id"], isset($contact["pa_address"]) && trim( $contact["pa_address"] ) !="" ? "postal_address" : "location_address", "Invalid street");
+                throw $ex;
+            }
+
             throw new \ClientException( $ex->getMessage() );
         }
 
@@ -886,6 +1199,54 @@ class openprovider extends Registrar{
      * @throws \Exception
      */
     public function getAuthCode($domain ){
+        $domainParams =  $this->getDomainParams($domain);
+
+        $info = $this->sendRequest("searchDomainRequest", array(
+            'extension' => $domainParams["extension"],
+            "domainNamePattern" => $domainParams["name"],
+        ) )->getValue();
+
+        $domainInfo = null;
+
+        foreach ($info["results"] as $result) {
+            if (
+                $result["domain"]["name"] . "." . $result["domain"]["extension"] == $domain->getName() ||
+                $result["domain"]["name"] . "." . $result["domain"]["extension"] == $domain->getPunycode()
+            ) {
+                $domainInfo = $result;
+                break;
+            }
+        }
+
+        if( $domainInfo !== null ){
+            if( !in_array($domain->getTLD(), array("ru","su","рф")) ){
+                if( isset($domainInfo["creationDate"]) && strtotime("+60 day", strtotime($domainInfo["creationDate"])) > time() ){
+                    return array(
+                        "result" => "success",
+                        "authcode" => "Transfer is unavailable until " . date("Y-m-d", strtotime("+60 day", strtotime($domainInfo["creationDate"])))
+                    );
+                }
+            }
+
+            if( isset($domainInfo["registryDetails"]["eppStatuses"]) ) {
+                foreach ( $domainInfo["registryDetails"]["eppStatuses"] as $status ){
+                    if( $status == "clientTransferProhibited"){
+                        try {
+                            $this->sendRequest("modifyDomainRequest", array(
+                                'domain' => $this->getDomainParams($domain),
+                                "isLocked" => 0,
+                            ));
+                        }catch (\Exception $ex){
+                            return array(
+                                "result" => "success",
+                                "authcode" => "Modify transfer lock failed. Please, contact support."
+                            );
+                        }
+                        break;
+                    }
+                }
+            }
+        }
 
         try {
             $this->sendRequest("resetAuthCodeDomainRequest", array(
@@ -896,10 +1257,26 @@ class openprovider extends Registrar{
             ));
 
         }catch (\Exception $ex){
+            $throwException = true;
+            if( strpos($ex->getMessage(), "Authorization code for this extension cannot be resetted") !== false ){
+                $reply = $this->sendRequest("requestAuthCodeDomainRequest", array(
+                    'domain' => $this->getDomainParams($domain),
+                ));
+                $throwException = false;
+            }
+
+
             if(strpos($ex->getMessage(),"is prohibited during transfer")!==false){
                 return array(
                     "result" => "success",
                     "authcode" => "Changing authCode is prohibited during transfer"
+                );
+            }
+
+            if(strpos($ex->getMessage(),"Action balance low")!==false){
+                return array(
+                    "result" => "success",
+                    "authcode" => "Operation currently unavailable, try again later"
                 );
             }
 
@@ -917,10 +1294,26 @@ class openprovider extends Registrar{
                         "result" => "success",
                         "authcode" => "Auth code sending is denied to unverified email. You must verify email."
                     );
-                }catch (\Exception $nothing){  }
+                }catch (\Exception $e){
+                    if( $e->getCode() == "20001" ){
+                        return array(
+                            "result" => "success",
+                            "authcode" => "Auth code sending is denied to unverified email. You must verify email."
+                        );
+                    }
+                }
             }
 
-            throw $ex;
+            if(strpos($ex->getMessage(),"Cannot do this operation because administrative data")!==false){
+                return array(
+                    "result" => "success",
+                    "authcode" => $ex->getMessage()
+                );
+            }
+
+            if( $throwException ) {
+                throw $ex;
+            }
         }
         $value = $reply->getValue();
         if(isset($value["authCode"]) && trim($value["authCode"]) != ""){
@@ -962,6 +1355,136 @@ class openprovider extends Registrar{
 
         return $info;
     }
+    /**
+     * @param $domainInfo
+     * @return bool|string
+     * @throws \Exception
+     */
+    private function getDomainPricePeriodStatus($domainInfo){
+        $domainStatus = false;
+        if (mb_strtoupper(trim($domainInfo["openproviderStatus"]), 'utf-8') =="DEL"){
+            if( in_array($domainInfo["extension"], array("xn--p1ai","ru")) ){
+                return self::SOFT_QUARANTINE;
+            }
+
+            if(isset($domainInfo["softQuarantineExpiryDate"]) &&
+                strtotime("now") < $domainInfo["softQuarantineExpiryDate"]){
+                $domainStatus = self::SOFT_QUARANTINE;
+            }elseif (isset($domainInfo["hardQuarantineExpiryDate"]) &&  strtotime("now") < $domainInfo["hardQuarantineExpiryDate"]){
+                $domainStatus = self::HARD_QUARANTINE;
+            }else{
+                throw new \Exception("Fail to get quarantine expiry date");
+            }
+
+        }
+        return $domainStatus;
+    }
+
+    /**
+     * @param $domain
+     * @return array
+     * @throws \Exception
+     */
+    private function getDomainInfo($domain)
+    {
+
+        $domainParams =  $this->getDomainParams($domain);
+
+        $info = $this->sendRequest("searchDomainRequest", array(
+            'extension' => $domainParams["extension"],
+            "domainNamePattern" => $domainParams["name"],
+        ) );
+
+        if($info == null || ! ($info instanceof \OP_Reply) ){
+            throw new \Exception("Unrecognized response from OPENPROVIDER");
+        } else {
+
+            $info = $info->getValue();
+
+            $out = array();
+            $out["result"] = "error";
+
+            foreach ($info["results"] as $result){
+                if(
+                    $result["domain"]["name"] . "." . $result["domain"]["extension"]  == $domain->getName() ||
+                    $result["domain"]["name"] . "." . $result["domain"]["extension"]  == $domain->getPunycode()
+                ){
+                    $out["result"] = "success";
+                    $out["whoisprivacy"] = isset($result["isPrivateWhoisEnabled"]) && $result["isPrivateWhoisEnabled"] === "1";
+                    $out["nss"] = $this->decodeNs($result["nameServers"]);
+
+                    $out["expire"] = strtotime( $result["expirationDate"] );
+                    if (isset($result["status"])){
+                        $out["openproviderStatus"] = $result["status"];
+                    }else{
+                        throw new \Exception("Fail to get domain status");
+                    }
+
+
+                    $out["extension"] =  $result["domain"]["extension"];
+                    $out["softQuarantineExpiryDate"] =  isset($result["softQuarantineExpiryDate"]) ? strtotime($result["softQuarantineExpiryDate"]) : null;
+                    $out["hardQuarantineExpiryDate"] =  isset($result["hardQuarantineExpiryDate"]) ? strtotime($result["hardQuarantineExpiryDate"]) : null;
+
+                    if( empty($out["nss"]) ){
+                        $out["status"] = "NOT_DELEGATE";
+                    } else {
+                        $out["status"] = "ACTIVE";
+                    }
+                    break;
+                }
+            }
+
+            \logger::dump("DOMAIN_INFO", $out,\logger::LEVEL_INFO);
+
+            if($out["result"] != "success"){
+                throw new \Exception("Domain not found", 404);
+            }
+        }
+        return $out;
+    }
+
+
+    /**
+     * @param $tld
+     * @return array|mixed
+     * @throws \Exception
+     */
+    private function getExtensionRequest($tld , $pricePeriodStatus){
+        $tld = mb_strtolower(trim($tld), 'utf-8');
+        $idna = new \idna_convert();
+        $extensions = array(
+            "withPrice" => 1,
+            "extensions" => array( $idna->encode($tld)));
+
+        $extensionList  = $this->sendRequest("searchExtensionRequest", $extensions);
+        if($extensionList == null || ! ($extensionList instanceof \OP_Reply) ){
+            throw new \Exception("Unrecognized response from OPENPROVIDER");
+        }else{
+            $tldInfo  = $extensionList->getValue();
+            $priseInfo = array();
+            foreach ($tldInfo["results"] as $result){
+                if (isset($result["name"])&& mb_strtolower(trim($result["name"]), "utf-8") ==  $idna->encode($tld)
+                    && isset($result["prices"][$pricePeriodStatus]["reseller"]["price"])){
+                    $priseInfo = $result["prices"];
+                    break;
+                }else{
+                    throw new \Exception("Fail to get price info");
+                }
+            }
+            return $priseInfo;
+        }
+
+    }
+
+    public function getAllExtensionRequest(){
+        $extensions = array(
+            "onlyNames" => "1",
+        );
+        $extensionList  = $this->sendRequest("searchExtensionRequest", $extensions);
+        \logger::dump("TLDSS" ,$extensionList->getValue() );
+        return $extensionList->getValue();
+    }
+
 
     /**
      * @param $command
