@@ -136,9 +136,6 @@
     <metadata name="processing.edit.pmopenprovider" type="form">
         <form>
             <page name="connect">
-                <field name="url">
-                    <input name="url" required="yes" type="text" />
-                </field>
                 <field name="login">
                     <input name="login" required="yes" type="text" />
                 </field>
@@ -164,8 +161,6 @@
             <msg name="hint_intendedUse">Intended use value should contain information on how the domain name will be used</msg>
         </messages>
         <messages name="processing.edit.pmopenprovider">
-            <msg name="url">Url</msg>
-            <msg name="hint_url">Virtual registrar API URL</msg>
             <msg name="login">Login</msg>
             <msg name="hint_login">Login</msg>
             <msg name="password">Password</msg>
@@ -327,8 +322,6 @@
             <msg name="hint_intendedUse">Intended use value should contain information on how the domain name will be used</msg>
         </messages>
         <messages name="processing.edit.pmopenprovider">
-            <msg name="url">Url</msg>
-            <msg name="hint_url">API URL виртуального регистратора</msg>
             <msg name="login">Login</msg>
             <msg name="hint_login">Login</msg>
             <msg name="password">Password</msg>

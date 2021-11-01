@@ -25,7 +25,7 @@ class openprovider extends Registrar{
         $this->auth_info = array(
             "login" => $RegInfo["login"],
             "password" => $RegInfo["password"],
-            "url" => $RegInfo["url"]
+            "url" => "https://api.openprovider.eu"//$RegInfo["url"]
         );
 
 

@@ -4,7 +4,7 @@ Plugin for Billmanager5 integration with openprovider
 # System requirements
 
 * Billmanager-ready OS (https://doc.ispsystem.com/index.php/BILLmanager_Installation_guide)
-* PHP 5.4+ with [php-mysqli](https://www.php.net/manual/mysqli.installation.php), [php-curl](https://www.php.net/manual/curl.installation.php), [php-simplexml](https://www.php.net/manual/simplexml.installation.php), [php-xml](https://www.php.net/manual/dom.installation.php), [php-mbstring](https://www.php.net/manual/mbstring.installation.php)
+* PHP 5.6 with [php-mysqli](https://www.php.net/manual/mysqli.installation.php), [php-curl](https://www.php.net/manual/curl.installation.php), [php-simplexml](https://www.php.net/manual/simplexml.installation.php), [php-xml](https://www.php.net/manual/dom.installation.php), [php-mbstring](https://www.php.net/manual/mbstring.installation.php)
 
 # Installation
 
@@ -32,8 +32,9 @@ ALTER TABLE `processingcache`
     ADD PRIMARY KEY (`id`);
 
 ```
-5. Restart billmanager to commit changes (killall core)
-6. Done
+5. Create new admin user with login "registrar" for notifications purpose
+6. Restart billmanager to commit changes (killall core)
+7. Done
 
 
 You can find the detailed guide to setting up the domain name provider modules by going to the link below:

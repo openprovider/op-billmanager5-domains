@@ -23,7 +23,8 @@ class Database
         $this->mysqli->options(MYSQLI_OPT_CONNECT_TIMEOUT, 10);
         $isConnected = $socket != null ?
             $this->mysqli->real_connect(null, $this->db['username'], $this->db['password'], null,null,$socket):
-            $this->mysqli->real_connect($this->db['hostname'], $this->db['username'], $this->db['password'], null,$this->db['port'],null,  MYSQLI_CLIENT_SSL);
+            $this->mysqli->real_connect($this->db['hostname'], $this->db['username'], $this->db['password'], null,$this->db['port'],null,
+                in_array($this->db['hostname'],["localhost","127.0.0.1"]) ? null : MYSQLI_CLIENT_SSL);
 
         if (!$isConnected)
         {
